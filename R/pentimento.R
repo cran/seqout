@@ -1,0 +1,601 @@
+#' @noRd
+.pnt_chr <- function(x) if (is.null(x)) NA_character_ else as.character(x)[1]
+
+#' @noRd
+.pnt_int <- function(x) if (is.null(x)) NA_integer_ else as.integer(x)[1]
+
+#' @noRd
+.pnt_num <- function(x) if (is.null(x)) NA_real_ else as.numeric(x)[1]
+
+#' NA (JSON null) means unscreened; FALSE means screened with no hit.
+#' @noRd
+.pnt_lgl <- function(x) if (is.null(x)) NA else as.logical(x)[1]
+
+#' @noRd
+.pnt_list <- function(x) {
+  if (is.null(x)) {
+    return(list(NULL))
+  }
+  list(as.character(unlist(x, use.names = FALSE)))
+}
+
+#' @noRd
+.pnt_tibble <- function(records, spec) {
+  if (length(records) == 0) {
+    empty <- lapply(spec, function(f) f(NULL)[0])
+    return(tibble::as_tibble(empty))
+  }
+  cols <- Map(function(f, nm) {
+    unlist(lapply(records, function(r) f(r[[nm]])),
+      recursive = FALSE, use.names = FALSE
+    )
+  }, spec, names(spec))
+  tibble::as_tibble(cols)
+}
+
+#' /single-cell caps a page at 1000 rows.
+#' @noRd
+.pnt_page <- 1000L
+
+# explicit specs preserve types and tri-state nulls .records_to_tibble cannot
+.pnt_sample_spec <- list(
+  sample_accession = .pnt_chr,
+  cells = .pnt_int,
+  genes = .pnt_int,
+  nnz = .pnt_num,
+  file_format = .pnt_chr,
+  unfiltered = .pnt_lgl,
+  n_runs = .pnt_int,
+  n_runs_measurable = .pnt_int,
+  species_called = .pnt_chr,
+  species_confidence = .pnt_chr,
+  species_hit_reads = .pnt_int,
+  species_hit_fraction = .pnt_num,
+  species_runner_up = .pnt_chr,
+  species_margin = .pnt_num,
+  species_ambiguous = .pnt_lgl,
+  species_mislabel = .pnt_lgl,
+  sex_verdict = .pnt_chr,
+  sex_confidence = .pnt_chr,
+  sex_reads_scanned = .pnt_int,
+  y_hits = .pnt_int,
+  xist_hits = .pnt_int,
+  y_xist_ratio = .pnt_num,
+  sex_panel_status = .pnt_chr,
+  sex_mixed_suspected = .pnt_lgl,
+  deep_n_reads = .pnt_int,
+  assay = .pnt_chr,
+  assay_display = .pnt_chr,
+  assay_is_single_cell = .pnt_lgl,
+  calls_ambiguous = .pnt_lgl,
+  flags = .pnt_list,
+  n_flags = .pnt_int,
+  hpv_top_type = .pnt_chr,
+  hpv_ambiguous = .pnt_lgl,
+  has_viral_reads = .pnt_lgl,
+  has_bacterial_reads = .pnt_lgl,
+  viral_kmer_mass = .pnt_num,
+  bacterial_kmer_mass = .pnt_num,
+  title = .pnt_chr,
+  tissue = .pnt_chr
+)
+
+.pnt_study_spec <- list(
+  study_accession = .pnt_chr,
+  source = .pnt_chr,
+  title = .pnt_chr,
+  study_cells = .pnt_num,
+  cells_unfiltered = .pnt_lgl,
+  single_cell_file_format = .pnt_chr,
+  n_samples_reported = .pnt_int,
+  n_samples_detailed = .pnt_int,
+  sample_cells_total = .pnt_num,
+  unassigned_cells = .pnt_num,
+  sample_breakdown_complete = .pnt_lgl,
+  any_unfiltered = .pnt_lgl,
+  n_runs_linked = .pnt_int,
+  n_runs_preflightx = .pnt_int,
+  n_runs_measurable = .pnt_int,
+  has_metadata = .pnt_lgl,
+  has_celltype = .pnt_lgl,
+  has_donor = .pnt_lgl,
+  has_demographics = .pnt_lgl,
+  flags = .pnt_list
+)
+
+#' @noRd
+.pnt_evidence_spec <- list(
+  samples_with_matrix = .pnt_int,
+  barcode_whitelist_hit = .pnt_lgl,
+  r1_length_single_cell = .pnt_lgl,
+  n_independent_evidence = .pnt_int,
+  has_matrix = .pnt_lgl,
+  has_reads_linked = .pnt_lgl,
+  reads_scanned = .pnt_lgl,
+  kind = .pnt_chr,
+  # list-columns: a study can file reads under more than one accession
+  matrix_accessions = .pnt_list,
+  reads_accessions = .pnt_list
+)
+
+#' @noRd
+.pnt_status_spec <- c(
+  list(
+    accession = .pnt_chr,
+    queried_as = .pnt_chr,
+    source = .pnt_chr,
+    single_cell_status = .pnt_chr,
+    in_unified_metadata = .pnt_lgl,
+    in_pentimento = .pnt_lgl
+  ),
+  .pnt_evidence_spec
+)
+
+#' Flatten nested `evidence` into status or summary row
+#' @noRd
+.pnt_flatten_evidence <- function(res) {
+  ev <- res$evidence
+  res$evidence <- NULL
+  c(res, if (is.null(ev)) list() else ev)
+}
+
+#' Determine if a study is single-cell
+#'
+#' `kind` describes the evidence behind the call:
+#' \describe{
+#'   \item{`matrix_and_reads`}{counts and reads, both confirmed}
+#'   \item{`matrix_reads_unscanned`}{counts plus linked FASTQ no read-derived
+#'     call has confirmed yet}
+#'   \item{`matrix_only`}{counts, no linked reads}
+#'   \item{`reads_only`}{no parsed matrix}
+#' }
+#'
+#' @param accession A study or series accession, or one resolving to a study.
+#' @inheritParams project
+#'
+#' @return A one-row tibble, or an empty one when the accession is unknown to
+#'   both the unified catalogue and the Pentimento.
+#'
+#' @seealso [project_single_cell_summary()] for the study-level rollup,
+#'   [project_single_cell()] for the per-sample counts.
+#'
+#' @export
+#' @examplesIf SeqoutOnline()
+#' \donttest{
+#' st <- ProjectSingleCellStatus("GSE168652")
+#' st$single_cell_status
+#' st$n_independent_evidence
+#' }
+project_single_cell_status <- function(accession, con = .con()) {
+  .need_api(con, "project_single_cell_status",
+    why = "There is no Pentimento table in the dump."
+  )
+  check_required(accession)
+
+  path <- paste0(
+    "/project/", toupper(trimws(accession)), "/single-cell/status"
+  )
+  res <- .api_get(con, path, null_on = 404L)
+  if (is.null(res)) {
+    return(.pnt_tibble(list(), .pnt_status_spec))
+  }
+  .pnt_tibble(list(.pnt_flatten_evidence(res)), .pnt_status_spec)
+}
+
+#' @noRd
+.pnt_summary_spec <- c(
+  .pnt_study_spec,
+  list(
+    queried_as = .pnt_chr,
+    single_cell_status = .pnt_chr,
+    microbe_measured = .pnt_lgl,
+    n_viral_organisms = .pnt_int,
+    n_bacterial_organisms = .pnt_int
+  ),
+  .pnt_evidence_spec
+)
+
+#' Study-level single-cell summary: cells, reads scanned, microbes
+#'
+#' @param accession A study or series accession, or one resolving to a study.
+#' @inheritParams project
+#'
+#' @return A one-row tibble, empty when the study is not in the Pentimento.
+#'
+#' @seealso [project_single_cell_status()] when you need an answer even for a
+#'   study absent from the Pentimento.
+#'
+#' @export
+#' @examplesIf SeqoutOnline()
+#' \donttest{
+#' s <- ProjectSingleCellSummary("GSE168652")
+#' s$study_cells
+#' s$microbe_measured
+#' }
+project_single_cell_summary <- function(accession, con = .con()) {
+  .need_api(con, "project_single_cell_summary",
+    why = "There is no Pentimento table in the dump."
+  )
+  check_required(accession)
+
+  path <- paste0(
+    "/project/", toupper(trimws(accession)), "/single-cell/summary"
+  )
+  res <- .api_get(con, path, null_on = 404L)
+  if (is.null(res)) {
+    return(.pnt_tibble(list(), .pnt_summary_spec))
+  }
+  .pnt_tibble(list(.pnt_flatten_evidence(res)), .pnt_summary_spec)
+}
+
+#' @noRd
+.pnt_studies_spec <- list(
+  study_accession = .pnt_chr,
+  counted_matrix = .pnt_lgl,
+  barcode_whitelist_hit = .pnt_lgl,
+  r1_length_single_cell = .pnt_lgl,
+  n_independent_evidence = .pnt_int,
+  kind = .pnt_chr,
+  study_cells = .pnt_int,
+  any_unfiltered = .pnt_lgl,
+  single_cell_status = .pnt_chr
+)
+
+#' /single-cell/studies caps a page at 1000 rows.
+#' @noRd
+.pnt_studies_page <- 1000L
+
+#' Studies with single-cell evidence
+#'
+#' `data` selects on the `kind` column, which says what a study carries:
+#'
+#' \describe{
+#'   \item{`matrix_and_reads`}{counts and reads, both confirmed}
+#'   \item{`matrix_reads_unscanned`}{counts plus linked FASTQ no read-derived
+#'     call has confirmed yet}
+#'   \item{`matrix_only`}{counts, no linked reads}
+#'   \item{`reads_only`}{no parsed matrix}
+#' }
+#'
+#' `"any"` includes reads-only studies and warns when rows lack matrices.
+#'
+#' `reads_only` means Pentimento parsed no matrix. GEO supplementary files
+#' may contain a matrix readable by [seqout_counts()].
+#'
+#' @param min_evidence Minimum independent measurements, 1 to 3.
+#' @param data What the study must carry: `"any"`, `"matrix"`, `"fastq"` or
+#'   `"both"`.
+#'
+#'   `"matrix"` filters server-side. Other choices read every page before
+#'   `limit` counts.
+#' @param limit Maximum studies; `NULL` reads all, in pages of up to 1000.
+#' @param offset Number of studies to skip.
+#' @inheritParams project
+#'
+#' @return A study tibble, one row per study.
+#'
+#' @export
+#' @examplesIf SeqoutOnline()
+#' \donttest{
+#' # unrestricted, with matrix warning
+#' sc <- SingleCellStudies(limit = 100)
+#'
+#' # parsed matrices
+#' SingleCellStudies(data = "matrix", limit = 100)
+#'
+#' # linked reads
+#' SingleCellStudies(data = "fastq", limit = 100)
+#' }
+single_cell_studies <- function(con = .con(),
+                                min_evidence = 1,
+                                data = c("any", "matrix", "fastq", "both"),
+                                limit = NULL,
+                                offset = 0) {
+  .need_api(con, "single_cell_studies",
+    why = "There is no Pentimento table in the dump."
+  )
+  data <- match.arg(data)
+  keep <- .pnt_kinds[[data]]
+
+  # require_matrix excludes reads_only; narrower filters run here
+  require_matrix <- data %in% c("matrix", "both")
+  # local filters make limit count kept rows
+  walk_all <- !is.null(keep) && !setequal(keep, .pnt_kind_matrix)
+
+  page_size <- .pnt_studies_page
+  if (!is.null(limit) && !walk_all) {
+    page_size <- min(limit, .pnt_studies_page)
+  }
+  pages <- list()
+  n <- 0L
+  kept <- 0L
+  repeat {
+    res <- .api_get(
+      con, "/single-cell/studies",
+      min_evidence = min_evidence, require_matrix = require_matrix,
+      limit = page_size, offset = offset + n, null_on = 404L,
+      .accepts = .pnt_studies_params
+    )
+    rows <- if (is.null(res)) list() else .as_record_list(res$studies)
+    got <- length(rows)
+    if (got == 0) break
+    # n advances offset; kept enforces limit after local filtering
+    n <- n + got
+    if (!is.null(keep)) {
+      rows <- Filter(function(r) isTRUE(r$kind %in% keep), rows)
+    }
+    if (length(rows)) {
+      pages[[length(pages) + 1L]] <- rows
+      kept <- kept + length(rows)
+    }
+    if (!is.null(limit) && kept >= limit) break
+    # short page ends the set because no total is returned
+    if (got < page_size) break
+  }
+  if (length(pages) == 0) {
+    return(.pnt_tibble(list(), .pnt_studies_spec))
+  }
+  records <- unlist(pages, recursive = FALSE, use.names = FALSE)
+  if (length(records) == 0) {
+    return(.pnt_tibble(list(), .pnt_studies_spec))
+  }
+  if (!is.null(limit) && length(records) > limit) {
+    records <- records[seq_len(limit)]
+  }
+  out <- .pnt_tibble(records, .pnt_studies_spec)
+  if (identical(data, "any")) {
+    .warn_reads_only(out)
+  }
+  out
+}
+
+#' Warn when unrestricted results include reads-only studies
+#'
+#' Reads-only studies cannot feed a counts pipeline.
+#' @noRd
+.warn_reads_only <- function(out) {
+  n <- sum(out$kind %in% "reads_only", na.rm = TRUE)
+  if (n == 0) {
+    return(invisible(NULL))
+  }
+  cli::cli_warn(c(
+    "{n} of {nrow(out)} stud{?y/ies} {?has/have} no parsed counts matrix
+     ({.val reads_only}).",
+    i = "{.code data = \"matrix\"} keeps only what you can read a matrix from;
+         {.code data = \"fastq\"} keeps what you can realign."
+  ))
+}
+
+#' The `kind` values behind each `data` choice
+#'
+#' `NULL` leaves client filtering off; `require_matrix` covers matrix choices.
+#' @noRd
+.pnt_kind_matrix <- c("matrix_and_reads", "matrix_reads_unscanned", "matrix_only")
+
+#' @noRd
+.pnt_kinds <- list(
+  matrix = NULL,
+  both   = c("matrix_and_reads", "matrix_reads_unscanned"),
+  fastq  = c("matrix_and_reads", "matrix_reads_unscanned", "reads_only"),
+  any    = NULL
+)
+
+#' @noRd
+.pnt_studies_params <- c(
+  "min_evidence", "require_matrix", "limit", "offset"
+)
+
+#' Per-sample cell and gene counts for a study
+#'
+#' One row per sample with matrix dimensions and read-derived calls.
+#'
+#' `cells` counts matrix columns; for unfiltered 10x matrices these are
+#' barcodes, so the number is an upper bound and sums overcount.
+#'
+#' `has_*_reads = NA` means unscreened; `FALSE` means screened with no hit.
+#' `flags` preserves the same distinction.
+#'
+#'
+#' @param accession A study or series accession, or one resolving to a study.
+#' @param limit Maximum samples; `NULL` reads all, in pages of up to 1000.
+#' @param offset Number of samples to skip.
+#' @inheritParams project
+#'
+#' @return A sample tibble, empty when the study is unprocessed. The `study`
+#'   and `n_samples_total` attributes carry the study row and its total. The
+#'   `longread_chemistry` attribute carries every PacBio/Oxford Nanopore run
+#'   in the study (empty, not `NULL`, when there are none); the server only
+#'   computes it when `offset = 0`.
+#'
+#' @seealso [sample_microbes()] for the per-organism detections behind the
+#'   viral and bacterial flags, [project_longread_chemistry()] to read the
+#'   same run list without an `offset` argument.
+#'
+#' @export
+#' @examplesIf SeqoutOnline()
+#' \donttest{
+#' sc <- ProjectSingleCell("GSE168652")
+#' sc[, c("sample_accession", "cells", "genes")]
+#' attr(sc, "study")$study_cells
+#' attr(sc, "longread_chemistry")
+#' }
+project_single_cell <- function(accession, limit = NULL, offset = 0, con = .con()) {
+  .need_api(con, "project_single_cell",
+    why = "There is no Pentimento table in the dump."
+  )
+  check_required(accession)
+
+  path <- paste0("/project/", toupper(trimws(accession)), "/single-cell")
+  page_size <- if (is.null(limit)) .pnt_page else min(limit, .pnt_page)
+  res <- .api_get(con, path, limit = page_size, offset = offset, null_on = 404L)
+  if (is.null(res)) {
+    return(.pnt_tibble(list(), .pnt_sample_spec))
+  }
+
+  pages <- list(.as_record_list(res$samples))
+  n <- length(pages[[1]])
+  total <- .pnt_int(res$n_samples_detailed)
+  if (!is.na(total)) {
+    wanted <- total - offset
+    if (!is.null(limit)) wanted <- min(limit, wanted)
+    while (n < wanted) {
+      nxt <- .api_get(
+        con, path,
+        limit = min(.pnt_page, wanted - n),
+        offset = offset + n, null_on = 404L
+      )
+      more <- .as_record_list(nxt$samples)
+      # A stale total would never terminate.
+      if (length(more) == 0) break
+      pages[[length(pages) + 1L]] <- more
+      n <- n + length(more)
+    }
+  }
+
+  # repeated c() would be quadratic in the page count
+  records <- unlist(pages, recursive = FALSE, use.names = FALSE)
+  out <- .pnt_tibble(records, .pnt_sample_spec)
+  attr(out, "study") <- .pnt_tibble(list(res), .pnt_study_spec)
+  attr(out, "n_samples_total") <- total
+  # NULL when offset != 0; the server only computes it on the first page
+  attr(out, "longread_chemistry") <-
+    .pnt_tibble(.as_record_list(res$longread_chemistry), .lr_chem_spec())
+  out
+}
+
+.pnt_organism_spec <- list(
+  organism = .pnt_chr,
+  kingdom = .pnt_chr,
+  class = .pnt_chr,
+  n_organisms = .pnt_int,
+  n_unitigs = .pnt_int,
+  kmer_mass = .pnt_num,
+  reads = .pnt_num,
+  covered_bp = .pnt_num,
+  max_breadth_frac = .pnt_num,
+  is_validated_viral = .pnt_lgl,
+  is_viral_evidence = .pnt_lgl,
+  is_validated_bacterial = .pnt_lgl
+)
+
+.pnt_detection_spec <- list(
+  run_accession = .pnt_chr,
+  gsm_accession = .pnt_chr,
+  sample_accession = .pnt_chr,
+  study_accession = .pnt_chr,
+  organism = .pnt_chr,
+  kingdom = .pnt_chr,
+  class = .pnt_chr,
+  measurable = .pnt_lgl,
+  total_reads = .pnt_num,
+  reads = .pnt_num,
+  kmer_mass = .pnt_num,
+  n_unitigs = .pnt_int,
+  ref_bp = .pnt_num,
+  covered_bp = .pnt_num,
+  breadth_frac = .pnt_num,
+  is_background = .pnt_lgl,
+  is_validated_viral = .pnt_lgl,
+  is_viral_evidence = .pnt_lgl,
+  is_validated_bacterial = .pnt_lgl
+)
+
+.pnt_kingdom_spec <- list(
+  n_organisms = .pnt_int,
+  n_unitigs = .pnt_int,
+  kmer_mass = .pnt_num,
+  reads = .pnt_num,
+  covered_bp = .pnt_num,
+  max_breadth_frac = .pnt_num
+)
+
+#' Microbial reads found in a sample
+#'
+#' Returns one row per organism, ordered by k-mer mass.
+#'
+#' Panel-unitig alignments lack raw-read, UMI and replicate confirmation.
+#' `measurable = FALSE` or `NA` means unscreened and triggers a warning.
+#'
+#' `kmer_mass` weights k-mers within a run, so it carries no absolute scale.
+#' `n_unitigs` counts mapped unitigs.
+#'
+#' Spike-in, negative-control and background classes are excluded from totals.
+#'
+#'
+#' @param accession A GSM, or the archive sample accession behind one.
+#' @param kind Detection class: `"viral"`, `"bacterial"`, `"both"` or `"all"`.
+#' @param min_breadth Keep only detections covering at least this fraction of
+#'   the reference, overriding the stored gate.
+#' @param min_kmer_mass Keep only detections at or above this weighted k-mer
+#'   mass.
+#' @param validated_only Keep only detections that pass the stored gates.
+#' @param include_background Include reagent kitome and skin flora, which are
+#'   excluded by default.
+#' @param detail Return per-run rows; the organism view stays on the
+#'   `by_organism` attribute and costs no second request.
+#' @param limit The maximum number of detection rows to read, at most 1000.
+#' @inheritParams project
+#'
+#' @return An organism tibble, or a run-by-organism tibble when
+#'   `detail = TRUE`. `measurable`, `n_runs`, `totals`, `by_kingdom`,
+#'   `control_kingdoms` and the unpicked view are carried as attributes.
+#'
+#' @seealso [project_single_cell()] for the study-wide flags.
+#'
+#' @export
+#' @examplesIf SeqoutOnline()
+#' \donttest{
+#' m <- SampleMicrobes("GSM5155196", kind = "viral")
+#' m[, c("organism", "n_unitigs", "max_breadth_frac")]
+#' attr(m, "measurable")
+#' attr(m, "detections")
+#' }
+sample_microbes <- function(accession, kind = c("all", "viral", "bacterial", "both"),
+                            min_breadth = NULL, min_kmer_mass = NULL,
+                            validated_only = FALSE, include_background = FALSE,
+                            detail = FALSE, limit = 500, con = .con()) {
+  .need_api(con, "sample_microbes",
+    why = "There is no Pentimento table in the dump."
+  )
+  check_required(accession)
+  kind <- match.arg(kind)
+
+  res <- .api_get(
+    con, paste0("/sample/", toupper(trimws(accession)), "/microbes"),
+    kind = kind, min_breadth = min_breadth, min_kmer_mass = min_kmer_mass,
+    validated_only = validated_only, include_background = include_background,
+    limit = limit
+  )
+
+  organisms <- .pnt_tibble(.as_record_list(res$by_organism), .pnt_organism_spec)
+  detections <- .pnt_tibble(.as_record_list(res$detections), .pnt_detection_spec)
+  if (detail) {
+    out <- detections
+    attr(out, "by_organism") <- organisms
+  } else {
+    out <- organisms
+    attr(out, "detections") <- detections
+  }
+
+  kingdoms <- res$by_kingdom %||% list()
+  by_kingdom <- tibble::as_tibble(c(
+    list(kingdom = names(kingdoms) %||% character()),
+    .pnt_tibble(unname(kingdoms), .pnt_kingdom_spec)
+  ))
+
+  measurable <- .pnt_lgl(res$measurable)
+  attr(out, "measurable") <- measurable
+  attr(out, "n_runs") <- .pnt_int(res$n_runs)
+  attr(out, "totals") <- .pnt_tibble(list(res$totals %||% list()), .pnt_kingdom_spec)
+  attr(out, "by_kingdom") <- by_kingdom
+  attr(out, "control_kingdoms") <- unlist(res$control_kingdoms %||% list())
+
+  if (is.na(measurable) || !measurable) {
+    cli::cli_warn(c(
+      "{.val {accession}} was never screened for microbes.",
+      i = "The empty result reports missing data, and rules nothing out.",
+      i = "See {.code attr(x, \"measurable\")}."
+    ))
+  }
+  out
+}

@@ -1,0 +1,51 @@
+Package: seqout
+Title: Client for Querying the 'Seqout' Genomics Metadata Database
+Version: 0.2.8
+Authors@R: c(
+    person("Aniruddha", "Mukherjee", role = "aut",
+           comment = c(ORCID = "0009-0008-1350-6787")),
+    person("Mukesh", "Reddy", role = "aut"),
+    person("Saket", "Choudhary", role = c("aut", "cre"),
+           email = "saketc@iitb.ac.in",
+           comment = c(ORCID = "0000-0001-5202-7633")),
+    person("Saket Lab", role = "cph"))
+Description: Search and download genomics study metadata from 'Seqout'
+    <https://seqout.org>, through its REST (Representational State
+    Transfer) web service <https://seqout.org/api/> or its Parquet data dump
+    <https://seqout.org/data>. 'Seqout' indexes the National Center for
+    Biotechnology Information (NCBI) Gene Expression Omnibus (GEO)
+    <https://www.ncbi.nlm.nih.gov/geo/> and Sequence Read Archive (SRA)
+    <https://www.ncbi.nlm.nih.gov/sra>, the European Bioinformatics
+    Institute (EBI) European Nucleotide Archive (ENA)
+    <https://www.ebi.ac.uk/ena/browser/>, the DNA Data Bank of Japan (DDBJ)
+    Sequence Read Archive (DRA) and Genomic Expression Archive (GEA)
+    <https://www.ddbj.nig.ac.jp>, ArrayExpress
+    <https://www.ebi.ac.uk/biostudies/arrayexpress>, and the Genome
+    Sequence Archive (GSA) <https://ngdc.cncb.ac.cn/gsa/>.
+License: BSD_3_clause + file LICENSE
+URL: https://github.com/saketlab/seqout, https://seqout.org,
+        https://seqout.org/cli/R/
+BugReports: https://github.com/saketlab/seqout/issues
+Depends: R (>= 4.1.0)
+Imports: cli, curl, httr2 (>= 1.0.0), methods, rlang, stats, tibble,
+        tools, utils
+Suggests: DBI, dplyr, jsonlite, dbplyr, DESeq2, DT, duckdb, genevintage
+        (>= 0.1.2), ggplot2, hdf5r, Matrix, Rsamtools, scales, SexSeek,
+        Seurat, SeuratObject, SingleCellExperiment,
+        SummarizedExperiment, testthat (>= 3.0.0), knitr, rhdf5filters,
+        rmarkdown, withr
+Config/testthat/edition: 3
+Encoding: UTF-8
+VignetteBuilder: knitr
+Config/roxygen2/version: 8.1.1
+NeedsCompilation: no
+Packaged: 2026-11-03 18:04:09 UTC; saket
+Author: Aniruddha Mukherjee [aut] (ORCID:
+    <https://orcid.org/0009-0008-1350-6787>),
+  Mukesh Reddy [aut],
+  Saket Choudhary [aut, cre] (ORCID:
+    <https://orcid.org/0000-0001-5202-7633>),
+  Saket Lab [cph]
+Maintainer: Saket Choudhary <saketc@iitb.ac.in>
+Repository: CRAN
+Date/Publication: 2026-11-25 20:30:07 UTC

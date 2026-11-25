@@ -1,0 +1,493 @@
+skip_if_no <- function(pkg) skip_if_not_installed(pkg)
+
+test_that("a 10x triplet reads as observations by features", {
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+  m <- Matrix::Matrix(c(1, 0, 0, 2, 3, 0, 0, 4, 5, 0, 6, 0), nrow = 3, sparse = TRUE)
+  Matrix::writeMM(m, file.path(dir, "matrix.mtx"))
+  writeLines(
+    paste0("AAACCTGAGAAACC", c("AT", "GC", "TT", "GG"), "-1"),
+    file.path(dir, "barcodes.tsv")
+  )
+  writeLines(c("GeneA", "GeneB", "GeneC"), file.path(dir, "features.tsv"))
+
+  res <- seqout:::.read_10x_mtx(
+    file.path(dir, "matrix.mtx"), file.path(dir, "barcodes.tsv"),
+    file.path(dir, "features.tsv")
+  )
+  expect_equal(dim(res$X), c(4L, 3L))
+  expect_equal(rownames(res$var), c("GeneA", "GeneB", "GeneC"))
+  expect_equal(sum(res$X), 21)
+  expect_true(inherits(res$X, "CsparseMatrix"))
+})
+
+test_that("a header row in barcodes or features is dropped", {
+  expect_equal(seqout:::.drop_label_headers(c("x", "AAAC", "CCCG")), c("AAAC", "CCCG"))
+  expect_equal(seqout:::.drop_label_headers(c("Barcode", "AAAC")), "AAAC")
+})
+
+test_that("a delimited table is transposed to observations by features", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.csv")
+  utils::write.csv(
+    data.frame(gene = c("A", "B"), S1 = c(1, 4), S2 = c(2, 5), S3 = c(3, 6)),
+    path,
+    row.names = FALSE
+  )
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("S1", "S2", "S3"))
+  expect_equal(rownames(res$var), c("A", "B"))
+  expect_equal(dim(res$X), c(3L, 2L))
+})
+
+test_that("a gzipped table reads the same as a plain one", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.csv.gz")
+  con <- gzfile(path, "wt")
+  writeLines(c("gene,S1,S2", "A,1,2", "B,3,4"), con)
+  close(con)
+  res <- seqout:::.read_table(path)
+  expect_equal(dim(res$X), c(2L, 2L))
+})
+
+test_that("an rds holding a sparse matrix reads and is transposed", {
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+  m <- Matrix::Matrix(c(1, 0, 0, 2, 3, 0), nrow = 2, sparse = TRUE)
+  path <- file.path(dir, "m.rds")
+  saveRDS(m, path)
+  res <- seqout:::.read_rds(path)
+  expect_equal(dim(res$X), rev(dim(m)))
+})
+
+test_that("a CellRanger h5 reads, and feature_type filters it", {
+  skip_if_no("hdf5r")
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "m.h5")
+  h5 <- hdf5r::H5File$new(path, mode = "w")
+  grp <- h5$create_group("matrix")
+  grp[["data"]] <- c(1, 2, 3, 4, 5, 6)
+  grp[["indices"]] <- as.integer(c(0, 1, 0, 2, 1, 2))
+  grp[["indptr"]] <- as.integer(c(0, 2, 4, 6))
+  grp[["shape"]] <- as.integer(c(3, 3))
+  grp[["barcodes"]] <- paste0("AAACCTGAGAAACC", c("AT", "GC", "TT"), "-1")
+  features <- grp$create_group("features")
+  features[["name"]] <- c("GeneA", "GeneB", "GeneC")
+  features[["feature_type"]] <- c("Gene Expression", "Gene Expression", "Antibody Capture")
+  h5$close_all()
+
+  res <- seqout:::.read_10x_h5(path)
+  expect_equal(dim(res$X), c(3L, 3L))
+
+  rna <- seqout:::.read_10x_h5(path, feature_type = "Gene Expression")
+  expect_equal(rownames(rna$var), c("GeneA", "GeneB"))
+})
+
+test_that("an h5ad reads, including its categorical obs columns", {
+  skip_if_no("hdf5r")
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "a.h5ad")
+  h5 <- hdf5r::H5File$new(path, mode = "w")
+  x <- h5$create_group("X")
+  hdf5r::h5attr(x, "encoding-type") <- "csr_matrix"
+  x[["data"]] <- c(1, 2, 3, 4)
+  x[["indices"]] <- as.integer(c(0, 1, 1, 2))
+  x[["indptr"]] <- as.integer(c(0, 2, 3, 4))
+  obs <- h5$create_group("obs")
+  hdf5r::h5attr(obs, "_index") <- "_index"
+  obs[["_index"]] <- c("cell1", "cell2", "cell3")
+  celltype <- obs$create_group("celltype")
+  celltype[["codes"]] <- as.integer(c(0, 1, 0))
+  celltype[["categories"]] <- c("Tcell", "Bcell")
+  var <- h5$create_group("var")
+  hdf5r::h5attr(var, "_index") <- "_index"
+  var[["_index"]] <- c("G1", "G2", "G3")
+  h5$close_all()
+
+  res <- seqout:::.read_h5ad(path)
+  expect_equal(dim(res$X), c(3L, 3L))
+  expect_equal(rownames(res$obs), c("cell1", "cell2", "cell3"))
+  expect_equal(res$obs$celltype, c("Tcell", "Bcell", "Tcell"))
+  expect_equal(rownames(res$var), c("G1", "G2", "G3"))
+})
+
+test_that("a whitespace-delimited table with a short header reads", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt.gz")
+  con <- gzfile(path, "wt")
+  # write.table() output: quoted names, no corner cell on the header.
+  writeLines(c('"C1" "C2" "C3"', '"GeneA" 1 2 3', '"GeneB" 4 5 6'), con)
+  close(con)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("C1", "C2", "C3"))
+  expect_equal(rownames(res$var), c("GeneA", "GeneB"))
+  expect_equal(dim(res$X), c(3L, 2L))
+})
+
+test_that("a comma inside a quoted name does not beat the real delimiter", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt")
+  # Whitespace-delimited, but one sample name carries a comma. Deciding on
+  # which characters are present routes this to comma and reads back empty.
+  writeLines(c('"C,1" "C2" "C3"', '"GeneA" 1 2 3', '"GeneB" 4 5 6'), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("C,1", "C2", "C3"))
+  expect_equal(dim(res$X), c(3L, 2L))
+})
+
+test_that("a single-column table reads instead of coming back empty", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt")
+  # No delimiter at all in the header, which is the shape of a one-sample
+  # whitespace-delimited table.
+  writeLines(c("C1", "GeneA 5", "GeneB 7"), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), "C1")
+  expect_equal(rownames(res$var), c("GeneA", "GeneB"))
+  expect_equal(as.vector(res$X), c(5, 7))
+})
+
+test_that("a table that parses to nothing errors rather than returning empty", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt")
+  writeLines(c("no delimiters here", "still nothing"), path)
+  expect_error(seqout:::.read_table(path), "empty matrix")
+})
+
+test_that("a ragged sniff window falls back to the header", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt")
+  # The short middle row makes no delimiter split the data rows consistently.
+  writeLines(c("g\tC1\tC2", "A\t1", "B\t3\t4"), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("C1", "C2"))
+})
+
+test_that("a leading annotation column does not become a sample", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.csv")
+  writeLines(c("gene_id,symbol,C1,C2", "ENSG1,GeneA,1,0", "ENSG2,GeneB,3,4"), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("C1", "C2"))
+  expect_equal(dim(res$X), c(2L, 2L))
+})
+
+test_that("a tar expands to the readable unit inside it", {
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+
+  # A tar holding one 10x triplet, the shape GEO ships as GSE..._RAW.tar.
+  inner <- file.path(dir, "GSM1_hpc")
+  dir.create(inner)
+  m <- Matrix::Matrix(c(1, 0, 0, 2, 3, 0, 0, 4, 5, 0, 6, 0), nrow = 3, sparse = TRUE)
+  Matrix::writeMM(m, file.path(inner, "matrix.mtx"))
+  writeLines(
+    paste0("AAACCTGAGAAACC", c("AT", "GC", "TT", "GG"), "-1"),
+    file.path(inner, "barcodes.tsv")
+  )
+  writeLines(c("GeneA", "GeneB", "GeneC"), file.path(inner, "features.tsv"))
+  writeLines("readme", file.path(inner, "notes.pdf")) # a member with no role
+
+  tar_path <- file.path(dir, "GSM1_hpc.tar")
+  withr::with_dir(dir, utils::tar(tar_path, "GSM1_hpc"))
+
+  cache <- withr::local_tempdir()
+  file.copy(tar_path, file.path(cache, "GSM1_hpc.tar"))
+  counts <- list(accession = "GSE1", assay = "rna", cache_dir = cache)
+  unit <- list(
+    label = "GSM1", fmt = "tar", sample = "GSM1",
+    files = list(list(
+      url = file.path(cache, "GSM1_hpc.tar"),
+      role = "tar", name = "GSM1_hpc.tar"
+    )),
+    metadata_files = list()
+  )
+
+  expanded <- seqout:::.expand_tar(counts, unit)
+  expect_equal(expanded$fmt, "10x_mtx")
+  expect_setequal(
+    vapply(expanded$files, function(f) f$role, character(1)),
+    c("mtx", "barcodes", "features")
+  )
+
+  # Extracting once is enough; a second call reuses the marker directory.
+  expect_true(dir.exists(paste0(file.path(cache, "GSM1_hpc.tar"), ".extracted")))
+  expect_equal(seqout:::.expand_tar(counts, unit)$fmt, "10x_mtx")
+})
+
+test_that("a tar with nothing readable inside is an error, not an empty unit", {
+  dir <- withr::local_tempdir()
+  inner <- file.path(dir, "GSM2")
+  dir.create(inner)
+  writeLines("readme", file.path(inner, "notes.pdf"))
+  tar_path <- file.path(dir, "GSM2.tar")
+  withr::with_dir(dir, utils::tar(tar_path, "GSM2"))
+
+  cache <- withr::local_tempdir()
+  file.copy(tar_path, file.path(cache, "GSM2.tar"))
+  counts <- list(accession = "GSE2", assay = "rna", cache_dir = cache)
+  unit <- list(
+    label = "GSM2", fmt = "tar", sample = "GSM2",
+    files = list(list(url = file.path(cache, "GSM2.tar"), role = "tar", name = "GSM2.tar")),
+    metadata_files = list()
+  )
+  expect_error(seqout:::.expand_tar(counts, unit), "no readable matrix inside")
+})
+
+test_that("a gene length column does not become a sample", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt")
+  # the per-sample bulk shape GEO ships: gene id, Length, one count column
+  writeLines(c("EntrezID\tLength\tS1", "497097\t3634\t438", "100503874\t3259\t1"), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), "S1")
+  expect_equal(rownames(res$var), c("497097", "100503874"))
+  expect_equal(names(res$var), "Length")
+  expect_equal(as.vector(res$X), c(438, 1))
+})
+
+test_that("a headerless htseq file keeps its first gene and drops summary rows", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "GSM1_liver.counts.txt")
+  writeLines(
+    c("ENSG1\t5", "ENSG2\t7", "__no_feature\t99", "__alignment_not_unique\t3"),
+    path
+  )
+  expect_message(res <- seqout:::.read_table(path), "summary row")
+  expect_equal(rownames(res$obs), "GSM1_liver")
+  expect_equal(rownames(res$var), c("ENSG1", "ENSG2"))
+  expect_equal(as.vector(res$X), c(5L, 7L))
+})
+
+test_that("STAR summary rows are dropped too", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "GSM1_ReadsPerGene.out.tab")
+  writeLines(c("N_unmapped\t9", "N_multimapping\t8", "ENSG1\t5", "ENSG2\t7"), path)
+  res <- suppressMessages(seqout:::.read_table(path))
+  expect_equal(rownames(res$var), c("ENSG1", "ENSG2"))
+  expect_equal(as.vector(res$X), c(5L, 7L))
+})
+
+test_that("the txt triplet spelling classifies and groups as one unit", {
+  expect_equal(seqout::file_role("GSM1_x_features.txt.gz"), "features")
+  expect_equal(seqout::file_role("GSM1_x_barcodes.txt.gz"), "barcodes")
+  # a series-level consensus peak list stays a table of its own
+  expect_equal(seqout::file_role("GSE1_atac_consensus_peaks.txt.gz"), "table")
+  # A shared key groups the triplet by name.
+  keys <- seqout::group_key(
+    c("GSM1_x_barcodes.txt.gz", "GSM1_x_features.txt.gz", "GSM1_x_matrix.mtx.gz")
+  )
+  expect_equal(length(unique(keys)), 1L)
+})
+
+test_that("an LZF-compressed h5ad reads through the rhdf5filters plugin", {
+  skip_if_no("hdf5r")
+  skip_if_no("Matrix")
+  skip_if_no("rhdf5filters")
+  # the plugin is built against Rhdf5lib's HDF5, which can differ from hdf5r's
+  skip_on_cran()
+  # fixtures/lzf.h5ad comes from fixtures/make-lzf-h5ad.py; hdf5r cannot write LZF
+  withr::local_envvar(HDF5_PLUGIN_PATH = Sys.getenv("HDF5_PLUGIN_PATH"))
+  res <- tryCatch(seqout:::.read_h5ad(test_path("fixtures", "lzf.h5ad")), error = identity)
+  # "cannot decode" means seqout failed to register the plugin
+  if (inherits(res, "error") && !grepl("cannot decode", conditionMessage(res))) {
+    skip("the rhdf5filters LZF plugin does not load into hdf5r's HDF5 build")
+  }
+  expect_equal(dim(res$X), c(40L, 30L))
+  expect_equal(sum(res$X), 600)
+  expect_equal(rownames(res$obs)[1:2], c("cell0", "cell1"))
+  expect_equal(rownames(res$var)[1:2], c("gene0", "gene1"))
+})
+
+test_that("a missing HDF5 filter aborts with the file and a fix, not the HDF5 stack", {
+  local_mocked_bindings(.h5_plugins = function() invisible(FALSE), .has_rhdf5filters = function() FALSE)
+  hdf5_stack <- paste(
+    "HDF5-API Errors:",
+    "    error #000: ../../../src/H5Dio.c in H5Dread(): line 185: can't read data",
+    "    error #004: ../../../src/H5Z.c in H5Z_pipeline(): line 1359: required filter 'lzf' is not registered",
+    sep = "\n"
+  )
+  err <- expect_error(
+    seqout:::.with_h5_filters("/tmp/GSM1_x.h5ad", "GSM1", stop(hdf5_stack)),
+    class = "rlang_error"
+  )
+  msg <- conditionMessage(err)
+  expect_match(msg, "GSM1_x.h5ad", fixed = TRUE)
+  expect_match(msg, "lzf", ignore.case = TRUE)
+  expect_match(msg, "rhdf5filters", fixed = TRUE)
+  expect_match(msg, "gzip", fixed = TRUE)
+  expect_no_match(msg, "H5Dio.c", fixed = TRUE)
+
+  blosc <- expect_error(seqout:::.with_h5_filters(
+    "x.h5ad", "GSM1", stop("required filter 'blosc' is not registered")
+  ))
+  expect_match(conditionMessage(blosc), "blosc", fixed = TRUE)
+
+  expect_error(seqout:::.with_h5_filters("x.h5", "x", stop("unrelated")), "unrelated")
+})
+
+test_that("an h5ad with nullable-string-array indexes reads, masked values as NA", {
+  skip_if_no("hdf5r")
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "a.h5ad")
+  h5 <- hdf5r::H5File$new(path, mode = "w")
+  x <- h5$create_group("X")
+  hdf5r::h5attr(x, "encoding-type") <- "csr_matrix"
+  x[["data"]] <- c(1, 2)
+  x[["indices"]] <- as.integer(c(0, 1))
+  x[["indptr"]] <- as.integer(c(0, 1, 2))
+  nullable <- function(grp, values, mask) {
+    hdf5r::h5attr(grp, "_index") <- "_index"
+    idx <- grp$create_group("_index")
+    hdf5r::h5attr(idx, "encoding-type") <- "nullable-string-array"
+    idx[["values"]] <- values
+    idx[["mask"]] <- mask
+  }
+  nullable(h5$create_group("obs"), c("cell1", "cell2"), c(FALSE, FALSE))
+  var <- h5$create_group("var")
+  nullable(var, c("G1", "G2"), c(FALSE, FALSE))
+  donor <- var$create_group("note")
+  hdf5r::h5attr(donor, "encoding-type") <- "nullable-string-array"
+  donor[["values"]] <- c("a", "b")
+  donor[["mask"]] <- c(FALSE, TRUE)
+  h5$close_all()
+
+  res <- seqout:::.read_h5ad(path)
+  expect_equal(rownames(res$obs), c("cell1", "cell2"))
+  expect_equal(rownames(res$var), c("G1", "G2"))
+  expect_equal(res$var$note, c("a", NA))
+})
+
+test_that("an h5ad indexed only by row numbers warns that orientation is unknown", {
+  skip_if_no("hdf5r")
+  skip_if_no("Matrix")
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "a.h5ad")
+  h5 <- hdf5r::H5File$new(path, mode = "w")
+  x <- h5$create_group("X")
+  hdf5r::h5attr(x, "encoding-type") <- "csr_matrix"
+  x[["data"]] <- c(1, 2)
+  x[["indices"]] <- as.integer(c(0, 1))
+  x[["indptr"]] <- as.integer(c(0, 1, 2))
+  for (nm in c("obs", "var")) {
+    g <- h5$create_group(nm)
+    hdf5r::h5attr(g, "_index") <- "_index"
+    g[["_index"]] <- c("0", "1")
+  }
+  h5$close_all()
+
+  expect_warning(seqout:::.read_h5ad(path, label = "GSM1"), "row number")
+})
+
+test_that("GSE300265's LZF h5ad reads, warning that its indexes are row numbers", {
+  skip_unless_live()
+  skip_if(!identical(Sys.getenv("SEQOUT_TEST_DOWNLOADS"), "true"), "downloads 108 MB")
+  skip_unless_readable("h5ad")
+  skip_if_no("rhdf5filters")
+  counts <- seqout_counts("GSE300265")
+  expect_warning(m <- seqout_matrix(counts, sample = "GSM9056718"), "row number")
+  # the file stores genes as obs, so seqout's cells-are-obs read swaps the axes
+  expect_equal(dim(m$X), c(19326L, 36601L))
+})
+
+test_that("vendor annotation, empty and normalised columns stay out of X", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "counts.txt")
+  writeLines(c(
+    "gene\tFPKM.S1\tFPKM.S2\tcount.S1\tcount.S2\tgene_start\tgene_Dbxref\t\t",
+    "A\t1.5\t2.5\t10\t20\t100\t71661\t\t",
+    "B\t3.5\t4.5\t30\t40\t200\t66050\t\t"
+  ), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("count.S1", "count.S2"))
+  expect_true(all(c("FPKM.S1", "gene_start", "gene_Dbxref") %in% names(res$var)))
+  expect_equal(as.vector(res$X), c(10, 20, 30, 40))
+})
+
+test_that("a table of only FPKM columns is still read", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "fpkm.txt")
+  writeLines(c("gene\tFPKM.S1\tFPKM.S2", "A\t1.5\t2.5"), path)
+  expect_equal(dim(seqout:::.read_table(path)$X), c(2L, 1L))
+})
+
+write_rcc <- function(path, sample_id = "1", endogenous = c(VTN = 66375, KIT = 32)) {
+  con <- gzfile(path, "wt")
+  writeLines(c(
+    "<Header>", "FileVersion,1.7", "</Header>", "",
+    "<Sample_Attributes>", paste0("ID,", sample_id), "Owner,Lab", "Date,20170426",
+    "GeneRLF,NS_Immunology_v2", "</Sample_Attributes>", "",
+    "<Lane_Attributes>", "ID,1", "FovCount,555", "FovCounted,542",
+    "BindingDensity,1.23", "CartridgeBarcode,", "</Lane_Attributes>", "",
+    "<Code_Summary>", "CodeClass,Name,Accession,Count",
+    paste0("Endogenous,", names(endogenous), ",NM_0", seq_along(endogenous), ",", endogenous),
+    "Endogenous,ALAS1,NM_000688.4,10",
+    "Housekeeping,ALAS1,NM_000688.4,1524",
+    "Positive,POS_A(128),ERCC_00117.1,41234",
+    "Negative,NEG_A(0),ERCC_00096.1,9",
+    "</Code_Summary>", "", "<Messages>", "</Messages>"
+  ), con)
+  close(con)
+  path
+}
+
+test_that("an nCounter RCC reads as one observation with probe classes and lane QC", {
+  path <- write_rcc(file.path(withr::local_tempdir(), "GSM9_01_NAS5.RCC.gz"))
+  res <- seqout:::.read_rcc(path)
+  expect_equal(rownames(res$X), "GSM9_01_NAS5")
+  # a name in two code classes keeps both rows, told apart by class
+  expect_equal(colnames(res$X), c("VTN", "KIT", "ALAS1|Endogenous", "ALAS1|Housekeeping", "POS_A(128)", "NEG_A(0)"))
+  expect_equal(as.vector(res$X), c(66375, 32, 10, 1524, 41234, 9))
+  expect_equal(res$var$code_class, c("Endogenous", "Endogenous", "Endogenous", "Housekeeping", "Positive", "Negative"))
+  expect_equal(res$obs$lane_FovCounted, 542)
+  expect_equal(res$obs$lane_BindingDensity, 1.23)
+  expect_true(is.na(res$obs$lane_CartridgeBarcode))
+  expect_equal(seqout:::.read_rcc(path, label = "GSM9")$obs |> rownames(), "GSM9")
+})
+
+test_that("CRLF line endings read the same", {
+  dir <- withr::local_tempdir()
+  unix <- write_rcc(file.path(dir, "a.RCC.gz"))
+  crlf <- file.path(dir, "b.RCC")
+  writeBin(charToRaw(paste0(paste(readLines(gzfile(unix)), collapse = "\r\n"), "\r\n")), crlf)
+  expect_equal(seqout:::.read_rcc(crlf)$X, seqout:::.read_rcc(unix, label = "b")$X)
+})
+
+test_that("a file without a Code_Summary is refused", {
+  path <- file.path(withr::local_tempdir(), "x.RCC")
+  writeLines(c("<Header>", "FileVersion,1.7", "</Header>"), path)
+  expect_error(seqout:::.read_rcc(path), "Code_Summary")
+})
+
+test_that("a header of numeric sample ids is still a header", {
+  path <- file.path(withr::local_tempdir(), "counts.txt")
+  writeLines(c("key\t2683\t2685", "ENSG1\t5\t7", "ENSG2\t1\t0"), path)
+  res <- seqout:::.read_table(path)
+  expect_equal(rownames(res$obs), c("2683", "2685"))
+  expect_equal(rownames(res$var), c("ENSG1", "ENSG2"))
+})
+
+test_that("an htseq file without a header is still read as headerless", {
+  path <- file.path(withr::local_tempdir(), "GSM1_htseq.txt")
+  writeLines(c("ENSG1\t5", "ENSG2\t7"), path)
+  expect_equal(rownames(seqout:::.read_table(path)$var), c("ENSG1", "ENSG2"))
+})
+
+test_that("repeated feature names keep every row instead of failing", {
+  path <- file.path(withr::local_tempdir(), "counts.txt")
+  writeLines(c("gene\tS1\tS2", "Y_RNA\t1\t2", "TP53\t5\t7", "Y_RNA\t3\t4"), path)
+  expect_message(res <- seqout:::.read_table(path), "1 repeated feature name")
+  expect_equal(rownames(res$var), c("Y_RNA", "TP53", "Y_RNA.1"))
+  expect_equal(as.vector(res$X[, "Y_RNA.1"]), c(3, 4))
+})
+
+test_that("repeated names in an R-written table (short header) stay aligned", {
+  path <- file.path(withr::local_tempdir(), "counts.txt")
+  writeLines(c("S1\tS2", "Y_RNA\t1\t2", "Y_RNA\t3\t4"), path)
+  res <- suppressMessages(seqout:::.read_table(path))
+  expect_equal(rownames(res$obs), c("S1", "S2"))
+  expect_equal(as.vector(res$X[, "Y_RNA.1"]), c(3, 4))
+})

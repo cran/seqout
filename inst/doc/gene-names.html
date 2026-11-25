@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Gene names: old identifiers and Excel errors</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Gene names: old identifiers and Excel
+errors</h1>
+
+
+
+<p><code>SeqoutGeneNames()</code> uses the <strong>genevintage</strong>
+package to change gene IDs to gene names.
+<code>SeqoutCorrectNames()</code> repairs gene symbols that Excel
+changed into dates. The two functions accept the result of
+<code>SeqoutMatrix()</code>. They also accept a numeric matrix that has
+one gene in each row. They do not change the expression values or the
+order of the rows. They keep the feature metadata aligned, and they
+record the original labels and the status of each change.</p>
+<p>Install seqout and genevintage from the r-universe of Saket Lab:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;seqout&quot;</span>, <span class="at">repos =</span> <span class="fu">c</span>(</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>  <span class="st">&quot;https://saketlab.r-universe.dev&quot;</span>, <span class="st">&quot;https://cloud.r-project.org&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>))</span></code></pre></div>
+<p>The commands for the full data download GEO files and annotation
+tables when you use them for the first time. The examples that run in
+this vignette use small excerpts that seqout includes. The excerpts have
+no changes from the original files, and they run offline. The source
+URLs and the method of extraction are in
+<code>extdata/gene-names/README.md</code> in the installed package.</p>
+<div id="old-ensembl-ids-from-a-2014-single-cell-experiment" class="section level2">
+<h2>Old Ensembl IDs from a 2014 single-cell experiment</h2>
+<p><a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52529">GSE52529</a>
+is the Monocle study of myoblast differentiation. It became public on 23
+March 2014. Its single-cell file has 47,192 gene rows and 372 cells. The
+rows have the original Ensembl IDs with versions, for example
+<code>ENSG00000000003.10</code>.</p>
+<p>The values are FPKM, not raw counts. Select
+<code>GSE52529_fpkm_matrix.txt.gz</code>. The <code>truseq</code> file
+is a different file, and it has bulk measurements.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">SeqoutListCounts</span>(<span class="st">&quot;GSE52529&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="fu">SeqoutMatrix</span>(<span class="at">sample =</span> <span class="st">&quot;GSE52529_fpkm_matrix.txt.gz&quot;</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">dim</span>(old<span class="sc">$</span>X)</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">rownames</span>(old<span class="sc">$</span>X))</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co"># automatic selection; decision recorded below</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>automatic <span class="ot">&lt;-</span> old <span class="sc">|&gt;</span> <span class="fu">SeqoutGeneNames</span>()</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>automatic<span class="sc">$</span>gene_annotation[[<span class="dv">1</span>]]<span class="sc">$</span>annotation</span></code></pre></div>
+<p>The automatic selection of a release is an estimate with a rank.
+These conditions can make it incorrect:</p>
+<ul>
+<li>A filtered set of genes can agree with more than one reference.</li>
+<li>Two adjacent releases can have the same set of genes.</li>
+<li>The ID versions do not identify only one annotation.</li>
+</ul>
+<p>For this file, the function selects GENCODE 17 on GRCh37. This agrees
+with the <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM1268960">GEO
+record of the sample</a>. It is not necessary to give the release or the
+assembly. All 47,192 IDs in the file agree accurately with that
+reference, and their version suffixes also agree.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">SeqoutGeneReport</span>(automatic))</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">stopifnot</span>(</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">unname</span>(old<span class="sc">$</span>X), <span class="fu">unname</span>(automatic<span class="sc">$</span>X)),</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="fu">identical</span>(<span class="fu">rownames</span>(automatic<span class="sc">$</span>X), <span class="fu">rownames</span>(automatic<span class="sc">$</span>var))</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>The rank of the releases does not download an annotation. It uses the
+full vector of the original IDs, which seqout includes as a different
+file from the expression excerpt. If the rank uses only the genes in the
+excerpt, the result can be different.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>id_file <span class="ot">&lt;-</span> <span class="fu">gzfile</span>(<span class="fu">file.path</span>(example_dir, <span class="st">&quot;GSE52529-gene-ids.txt.gz&quot;</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>old_ids <span class="ot">&lt;-</span> <span class="fu">readLines</span>(id_file)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">close</span>(id_file)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">head</span>(genevintage<span class="sc">::</span><span class="fu">detect_release</span>(old_ids), <span class="dv">3</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt;        species  source release assembly feasible   dist n_index</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; 1 homo_sapiens gencode      17       37     TRUE 0.2023   57232</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; 2 homo_sapiens gencode      18       37     TRUE 0.2078   57396</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; 3 homo_sapiens gencode      19       37     TRUE 0.2169   57773</span></span></code></pre></div>
+<p>The example that follows uses the first 12 genes and the first three
+cells of the file. It changes the IDs with the related excerpt of
+GENCODE 17:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>old_excerpt <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(<span class="fu">read_example</span>(<span class="st">&quot;GSE52529-excerpt.tsv.gz&quot;</span>, <span class="at">row.names =</span> <span class="dv">1</span>))</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>gencode17 <span class="ot">&lt;-</span> <span class="fu">read_example</span>(<span class="st">&quot;gencode17-excerpt.tsv.gz&quot;</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>old_named <span class="ot">&lt;-</span> <span class="fu">SeqoutGeneNames</span>(old_excerpt, <span class="at">mapping =</span> gencode17)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="fu">SeqoutGeneReport</span>(old_named)[, <span class="fu">c</span>(<span class="st">&quot;input&quot;</span>, <span class="st">&quot;name&quot;</span>, <span class="st">&quot;status&quot;</span>)]</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt;                 input     name status</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; 1  ENSG00000000003.10   TSPAN6 mapped</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; 2   ENSG00000000005.5     TNMD mapped</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; 3   ENSG00000000419.8     DPM1 mapped</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; 4   ENSG00000000457.8    SCYL3 mapped</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; 5  ENSG00000000460.12 C1orf112 mapped</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; 6   ENSG00000000938.8      FGR mapped</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; 7  ENSG00000000971.11      CFH mapped</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; 8   ENSG00000001036.8    FUCA2 mapped</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt; 9   ENSG00000001084.6     GCLC mapped</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; 10 ENSG00000001167.10     NFYA mapped</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; 11 ENSG00000001460.13    STPG1 mapped</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co">#&gt; 12 ENSG00000001461.12   NIPAL3 mapped</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(<span class="fu">as.vector</span>(old_excerpt), <span class="fu">as.vector</span>(old_named)))</span></code></pre></div>
+<p>The function does not use the version suffixes to find a match. But
+the record of changes keeps the suffixes. For example,
+<code>ENSG00000000003.10</code> becomes <code>TSPAN6</code>.</p>
+<p>If an ID has no name in the selected annotation, the ID does not
+change. If two rows have the same symbol, each row gets a different
+label. The <code>name</code> column of the record keeps the symbol
+without the suffix. The function does not add rows together.</p>
+</div>
+<div id="repair-excel-errors-in-a-real-matrix-from-geo" class="section level2">
+<h2>Repair Excel errors in a real matrix from GEO</h2>
+<p><a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE101942">GSE101942</a>
+has gene names that Excel changed. We examined the original file
+<code>GSE101942_IPSC_rawCounts.txt.gz</code>. It has 56,637 rows and six
+samples. Five of the rows are summary rows from the count tool. The row
+labels include <code>1-Mar</code>, <code>9-Sep</code>, and
+<code>15-Sep</code>.</p>
+<p>Give the name of the raw-count file to <code>SeqoutMatrix()</code>.
+The study also has tables of differential expression results, and these
+tables are not count matrices.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>damaged <span class="ot">&lt;-</span> <span class="fu">SeqoutListCounts</span>(<span class="st">&quot;GSE101942&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="fu">SeqoutMatrix</span>(<span class="at">sample =</span> <span class="st">&quot;GSE101942_IPSC_rawCounts.txt.gz&quot;</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># explicit target, not automatic</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>repaired <span class="ot">&lt;-</span> damaged <span class="sc">|&gt;</span> <span class="fu">SeqoutCorrectNames</span>(<span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">release =</span> <span class="dv">116</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">SeqoutGeneReport</span>(repaired)</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>report[report<span class="sc">$</span>status <span class="sc">!=</span> <span class="st">&quot;unchanged&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;input&quot;</span>, <span class="st">&quot;name&quot;</span>, <span class="st">&quot;status&quot;</span>)]</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(<span class="fu">unname</span>(damaged<span class="sc">$</span>X), <span class="fu">unname</span>(repaired<span class="sc">$</span>X)))</span></code></pre></div>
+<p>With Ensembl 116, the function repairs 25 labels. <code>15-Sep</code>
+stays unresolved, because this annotation has no candidate for it.</p>
+<p>The excerpt in seqout has all the 26 damaged labels. It also has
+<code>TP53</code> as a control that does not change. It has the six
+original sample columns and their counts. The annotation excerpt has all
+the candidates in the reference that relate to month names.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>excel_excerpt <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(<span class="fu">read_example</span>(<span class="st">&quot;GSE101942-excerpt.tsv.gz&quot;</span>, <span class="at">row.names =</span> <span class="dv">1</span>))</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>human116 <span class="ot">&lt;-</span> <span class="fu">read_example</span>(<span class="st">&quot;ensembl116-excel.tsv.gz&quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>excel_fixed <span class="ot">&lt;-</span> <span class="fu">SeqoutCorrectNames</span>(excel_excerpt, <span class="at">mapping =</span> human116, <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>excel_report <span class="ot">&lt;-</span> <span class="fu">SeqoutGeneReport</span>(excel_fixed)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>excel_report[</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  excel_report<span class="sc">$</span>input <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;1-Mar&quot;</span>, <span class="st">&quot;9-Sep&quot;</span>, <span class="st">&quot;15-Sep&quot;</span>, <span class="st">&quot;TP53&quot;</span>),</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">&quot;input&quot;</span>, <span class="st">&quot;name&quot;</span>, <span class="st">&quot;status&quot;</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>]</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt;     input    name     status</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt; 2   1-Mar MARCHF1  corrected</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt; 13 15-Sep  15-Sep unresolved</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; 26  9-Sep SEPTIN9  corrected</span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; 27   TP53    TP53  unchanged</span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="fu">table</span>(excel_report<span class="sc">$</span>status)</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="co">#&gt;  corrected  unchanged unresolved </span></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a><span class="co">#&gt;         25          1          1</span></span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(<span class="fu">as.vector</span>(excel_excerpt), <span class="fu">as.vector</span>(excel_fixed)))</span></code></pre></div>
+<div id="old-symbols-and-new-symbols" class="section level3">
+<h3>Old symbols and new symbols</h3>
+<p>Human Ensembl 95 and Ensembl 116 give different results for the same
+damaged labels. This example compares the two references. It does not
+find the release that GSE101942 used.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>human95 <span class="ot">&lt;-</span> <span class="fu">read_example</span>(<span class="st">&quot;ensembl95-excel.tsv.gz&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>excel_old <span class="ot">&lt;-</span> <span class="fu">SeqoutCorrectNames</span>(excel_excerpt, <span class="at">mapping =</span> human95, <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>old_report <span class="ot">&lt;-</span> <span class="fu">SeqoutGeneReport</span>(excel_old)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>show <span class="ot">&lt;-</span> excel_report<span class="sc">$</span>input <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;1-Mar&quot;</span>, <span class="st">&quot;9-Sep&quot;</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">data.frame</span>(</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">deposited =</span> excel_report<span class="sc">$</span>input[show],</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">ensembl95 =</span> old_report<span class="sc">$</span>name[show],</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="at">ensembl116 =</span> excel_report<span class="sc">$</span>name[show]</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>)</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt;   deposited ensembl95 ensembl116</span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; 1     1-Mar    MARCH1    MARCHF1</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; 2     9-Sep     SEPT9    SEPTIN9</span></span></code></pre></div>
+<p>With Ensembl 95, <code>1-Mar</code> becomes <code>MARCH1</code>. With
+Ensembl 116, <code>1-Mar</code> becomes <code>MARCHF1</code>. With the
+same references, <code>9-Sep</code> becomes <code>SEPT9</code> with
+Ensembl 95 and <code>SEPTIN9</code> with Ensembl 116.</p>
+<p>The names do not tell seqout the species or the release. For the
+repair of Excel errors, you must give an annotation table. Or, you must
+give the two arguments <code>species</code> and
+<code>release</code>.</p>
+<p>The function does not change a date that has more than one candidate.
+It gives the status <code>ambiguous</code> to that date. It gives the
+status <code>unresolved</code> to a value that has no candidate.
+genevintage cannot repair some formats, and it cannot repair numbers
+that lost precision. Before your analysis, examine the report. Repair
+only the columns that you know contain gene labels.</p>
+<p>If the damaged symbols are in the feature metadata, give that column
+with the <code>ids</code> argument:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>repaired <span class="ot">&lt;-</span> <span class="fu">SeqoutCorrectNames</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  rna,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="at">ids =</span> rna<span class="sc">$</span>var<span class="sc">$</span>symbol, <span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">release =</span> <span class="dv">116</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>)</span></code></pre></div>
+<p>The function keeps the original <code>var$symbol</code> column. The
+repaired labels become the row names of <code>X</code> and of
+<code>var</code>. Each call adds its record of changes to
+<code>gene_annotation</code>. To keep this record after you change the
+data to a Seurat or SingleCellExperiment object, save the corrected
+<code>seqout_matrix</code>.</p>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+
+</body>
+</html>

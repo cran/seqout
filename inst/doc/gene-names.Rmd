@@ -1,0 +1,214 @@
+---
+title: "Gene names: old identifiers and Excel errors"
+description: >
+  Change the original Ensembl IDs of a 2014 single-cell study to gene names,
+  and repair gene symbols that Excel changed.
+output:
+  rmarkdown::html_vignette:
+    self_contained: true
+    mathjax: null
+vignette: >
+  %\VignetteIndexEntry{Gene names: old identifiers and Excel errors}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(seqout)
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  eval = requireNamespace("genevintage", quietly = TRUE)
+)
+example_dir <- system.file("extdata", "gene-names", package = "seqout")
+read_example <- function(name, ...) {
+  read.delim(file.path(example_dir, name), check.names = FALSE, ...)
+}
+```
+
+`SeqoutGeneNames()` uses the **genevintage** package to change gene IDs to gene names.
+`SeqoutCorrectNames()` repairs gene symbols that Excel changed into dates.
+The two functions accept the result of `SeqoutMatrix()`.
+They also accept a numeric matrix that has one gene in each row.
+They do not change the expression values or the order of the rows.
+They keep the feature metadata aligned, and they record the original labels and the status of each change.
+
+Install seqout and genevintage from the r-universe of Saket Lab:
+
+```{r install, eval=FALSE}
+install.packages("seqout", repos = c(
+  "https://saketlab.r-universe.dev", "https://cloud.r-project.org"
+))
+```
+
+The commands for the full data download GEO files and annotation tables when you use them for the first time.
+The examples that run in this vignette use small excerpts that seqout includes.
+The excerpts have no changes from the original files, and they run offline.
+The source URLs and the method of extraction are in
+`extdata/gene-names/README.md` in the installed package.
+
+## Old Ensembl IDs from a 2014 single-cell experiment
+
+[GSE52529](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52529) is the
+Monocle study of myoblast differentiation.
+It became public on 23 March 2014.
+Its single-cell file has 47,192 gene rows and 372 cells.
+The rows have the original Ensembl IDs with versions, for example `ENSG00000000003.10`.
+
+The values are FPKM, not raw counts.
+Select `GSE52529_fpkm_matrix.txt.gz`.
+The `truseq` file is a different file, and it has bulk measurements.
+
+```{r old-study-download, eval=FALSE}
+old <- SeqoutListCounts("GSE52529") |>
+  SeqoutMatrix(sample = "GSE52529_fpkm_matrix.txt.gz")
+dim(old$X)
+head(rownames(old$X))
+
+# automatic selection; decision recorded below
+automatic <- old |> SeqoutGeneNames()
+automatic$gene_annotation[[1]]$annotation
+```
+
+The automatic selection of a release is an estimate with a rank.
+These conditions can make it incorrect:
+
+*   A filtered set of genes can agree with more than one reference.
+*   Two adjacent releases can have the same set of genes.
+*   The ID versions do not identify only one annotation.
+
+For this file, the function selects GENCODE 17 on GRCh37.
+This agrees with the
+[GEO record of the sample](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM1268960).
+It is not necessary to give the release or the assembly.
+All 47,192 IDs in the file agree accurately with that reference, and their version suffixes also agree.
+
+```{r automatic-audit, eval=FALSE}
+head(SeqoutGeneReport(automatic))
+stopifnot(
+  identical(unname(old$X), unname(automatic$X)),
+  identical(rownames(automatic$X), rownames(automatic$var))
+)
+```
+
+The rank of the releases does not download an annotation.
+It uses the full vector of the original IDs, which seqout includes as a different file from the expression excerpt.
+If the rank uses only the genes in the excerpt, the result can be different.
+
+```{r old-study-ranking}
+id_file <- gzfile(file.path(example_dir, "GSE52529-gene-ids.txt.gz"))
+old_ids <- readLines(id_file)
+close(id_file)
+head(genevintage::detect_release(old_ids), 3)
+```
+
+The example that follows uses the first 12 genes and the first three cells of the file.
+It changes the IDs with the related excerpt of GENCODE 17:
+
+```{r old-study-offline}
+old_excerpt <- as.matrix(read_example("GSE52529-excerpt.tsv.gz", row.names = 1))
+gencode17 <- read_example("gencode17-excerpt.tsv.gz")
+old_named <- SeqoutGeneNames(old_excerpt, mapping = gencode17)
+SeqoutGeneReport(old_named)[, c("input", "name", "status")]
+stopifnot(identical(as.vector(old_excerpt), as.vector(old_named)))
+```
+
+The function does not use the version suffixes to find a match.
+But the record of changes keeps the suffixes.
+For example, `ENSG00000000003.10` becomes `TSPAN6`.
+
+If an ID has no name in the selected annotation, the ID does not change.
+If two rows have the same symbol, each row gets a different label.
+The `name` column of the record keeps the symbol without the suffix.
+The function does not add rows together.
+
+## Repair Excel errors in a real matrix from GEO
+
+[GSE101942](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE101942) has
+gene names that Excel changed.
+We examined the original file `GSE101942_IPSC_rawCounts.txt.gz`.
+It has 56,637 rows and six samples.
+Five of the rows are summary rows from the count tool.
+The row labels include `1-Mar`, `9-Sep`, and `15-Sep`.
+
+Give the name of the raw-count file to `SeqoutMatrix()`.
+The study also has tables of differential expression results, and these tables are not count matrices.
+
+```{r excel-study-download, eval=FALSE}
+damaged <- SeqoutListCounts("GSE101942") |>
+  SeqoutMatrix(sample = "GSE101942_IPSC_rawCounts.txt.gz")
+
+# explicit target, not automatic
+repaired <- damaged |> SeqoutCorrectNames(species = "human", release = 116)
+report <- SeqoutGeneReport(repaired)
+report[report$status != "unchanged", c("input", "name", "status")]
+stopifnot(identical(unname(damaged$X), unname(repaired$X)))
+```
+
+With Ensembl 116, the function repairs 25 labels.
+`15-Sep` stays unresolved, because this annotation has no candidate for it.
+
+The excerpt in seqout has all the 26 damaged labels.
+It also has `TP53` as a control that does not change.
+It has the six original sample columns and their counts.
+The annotation excerpt has all the candidates in the reference that relate to month names.
+
+```{r excel-study-offline}
+excel_excerpt <- as.matrix(read_example("GSE101942-excerpt.tsv.gz", row.names = 1))
+human116 <- read_example("ensembl116-excel.tsv.gz")
+excel_fixed <- SeqoutCorrectNames(excel_excerpt, mapping = human116, quiet = TRUE)
+excel_report <- SeqoutGeneReport(excel_fixed)
+excel_report[
+  excel_report$input %in% c("1-Mar", "9-Sep", "15-Sep", "TP53"),
+  c("input", "name", "status")
+]
+table(excel_report$status)
+stopifnot(identical(as.vector(excel_excerpt), as.vector(excel_fixed)))
+```
+
+### Old symbols and new symbols
+
+Human Ensembl 95 and Ensembl 116 give different results for the same damaged labels.
+This example compares the two references.
+It does not find the release that GSE101942 used.
+
+```{r excel-vintages}
+human95 <- read_example("ensembl95-excel.tsv.gz")
+excel_old <- SeqoutCorrectNames(excel_excerpt, mapping = human95, quiet = TRUE)
+old_report <- SeqoutGeneReport(excel_old)
+show <- excel_report$input %in% c("1-Mar", "9-Sep")
+data.frame(
+  deposited = excel_report$input[show],
+  ensembl95 = old_report$name[show],
+  ensembl116 = excel_report$name[show]
+)
+```
+
+With Ensembl 95, `1-Mar` becomes `MARCH1`.
+With Ensembl 116, `1-Mar` becomes `MARCHF1`.
+With the same references, `9-Sep` becomes `SEPT9` with Ensembl 95 and `SEPTIN9` with Ensembl 116.
+
+The names do not tell seqout the species or the release.
+For the repair of Excel errors, you must give an annotation table.
+Or, you must give the two arguments `species` and `release`.
+
+The function does not change a date that has more than one candidate.
+It gives the status `ambiguous` to that date.
+It gives the status `unresolved` to a value that has no candidate.
+genevintage cannot repair some formats, and it cannot repair numbers that lost precision.
+Before your analysis, examine the report.
+Repair only the columns that you know contain gene labels.
+
+If the damaged symbols are in the feature metadata, give that column with the `ids` argument:
+
+```{r feature-column, eval=FALSE}
+repaired <- SeqoutCorrectNames(
+  rna,
+  ids = rna$var$symbol, species = "human", release = 116
+)
+```
+
+The function keeps the original `var$symbol` column.
+The repaired labels become the row names of `X` and of `var`.
+Each call adds its record of changes to `gene_annotation`.
+To keep this record after you change the data to a Seurat or SingleCellExperiment object,
+save the corrected `seqout_matrix`.

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Getting started with seqout</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Getting started with seqout</h1>
+
+
+
+<p><code>seqout</code> is an R client for <a href="https://seqout.org">seqout.org</a>. It finds the metadata of
+studies and samples in these public genomic archives:</p>
+<ul>
+<li>Gene Expression Omnibus (GEO)</li>
+<li>Sequence Read Archive (SRA)</li>
+<li>European Nucleotide Archive (ENA)</li>
+<li>ArrayExpress</li>
+<li>DNA Data Bank of Japan (DDBJ DRA and GEA)</li>
+<li>Genome Sequence Archive (GSA)</li>
+</ul>
+<div id="installation" class="section level2">
+<h2>Installation</h2>
+<p>Install the package with <code>pak</code>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># install.packages(&quot;pak&quot;)</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>pak<span class="sc">::</span><span class="fu">pak</span>(<span class="st">&quot;saketlab/seqout/R&quot;</span>)</span></code></pre></div>
+<p>The default backend is the REST API. An API key or a local setup is
+not necessary for the REST API.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(seqout)</span></code></pre></div>
+</div>
+<div id="search-the-archives" class="section level2">
+<h2>Search the archives</h2>
+<div id="find-studies" class="section level3">
+<h3>Find studies</h3>
+<p><code>SeqoutSearch()</code> finds studies in all the archives. You
+can give free text, filters, or the two together.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">SeqoutSearch</span>(<span class="st">&quot;cervical cancer single cell&quot;</span>, <span class="at">db =</span> <span class="st">&quot;geo&quot;</span>, <span class="at">limit =</span> <span class="dv">5</span>)</span></code></pre></div>
+</div>
+<div id="find-samples-cohorts" class="section level3">
+<h3>Find samples (cohorts)</h3>
+<p><code>SampleSearch()</code> finds samples in all the studies. It uses
+the harmonized metadata as filters, for example tissue, disease, and
+age.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>liver <span class="ot">&lt;-</span> <span class="fu">SampleSearch</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">organism =</span> <span class="st">&quot;Homo sapiens&quot;</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">tissue =</span> <span class="st">&quot;liver&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">age_min_years =</span> <span class="dv">50</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">limit =</span> <span class="dv">5</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>liver[, <span class="fu">c</span>(<span class="st">&quot;sample&quot;</span>, <span class="st">&quot;study_accession&quot;</span>, <span class="st">&quot;tissue&quot;</span>, <span class="st">&quot;disease&quot;</span>, <span class="st">&quot;sex&quot;</span>, <span class="st">&quot;age&quot;</span>)]</span></code></pre></div>
+<p>For the query operators and the filters, refer to <a href="https://seqout.org/cli/R/articles/search.html">Search</a>.</p>
+</div>
+<div id="use-the-pipe" class="section level3">
+<h3>Use the pipe</h3>
+<p>The first argument of each function is its subject. The subject is an
+accession, a <code>seqout_counts</code> table, or a list of cohort
+filters. If a function has no other subject, the subject is the
+connection. You can connect the calls with the native pipe of R.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># A PubMed ID or a DOI, told apart by the value, to the datasets that cite it</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="st">&quot;34764296&quot;</span> <span class="sc">|&gt;</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="fu">Paper</span>() <span class="sc">|&gt;</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="fu">nrow</span>()</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">list</span>(<span class="at">tissue =</span> <span class="st">&quot;liver&quot;</span>, <span class="at">organism =</span> <span class="st">&quot;Homo sapiens&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="fu">SampleSearch</span>(<span class="at">limit =</span> <span class="dv">3</span>) <span class="sc">|&gt;</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="fu">subset</span>(<span class="at">select =</span> <span class="fu">c</span>(sample, study_accession, disease))</span></code></pre></div>
+<p>In all the other functions, <code>con</code> is the last
+argument.</p>
+</div>
+</div>
+<div id="get-the-metadata-of-a-study" class="section level2">
+<h2>Get the metadata of a study</h2>
+<p><code>SeqoutGet()</code> gets the metadata for the accession of a
+study, a sample, or a run. It also shows the related records in the
+other archives.</p>
+<p>When you read a field for the first time, <code>seqout</code> gets it
+from the API and keeps a copy.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">SeqoutGet</span>(<span class="st">&quot;GSE168652&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>d</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>d<span class="sc">$</span>meta<span class="sc">$</span>title</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">c</span>(<span class="at">samples =</span> <span class="fu">nrow</span>(d<span class="sc">$</span>samples), <span class="at">runs =</span> <span class="fu">nrow</span>(d<span class="sc">$</span>runs), <span class="at">papers =</span> <span class="fu">nrow</span>(d<span class="sc">$</span>pubs))</span></code></pre></div>
+<div id="harmonized-sample-attributes" class="section level3">
+<h3>Harmonized sample attributes</h3>
+<p>The <code>enriched</code> field shows the harmonized labels for each
+sample and each cell:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>d<span class="sc">$</span>enriched[, <span class="fu">c</span>(<span class="st">&quot;sample&quot;</span>, <span class="st">&quot;tissue&quot;</span>, <span class="st">&quot;disease&quot;</span>, <span class="st">&quot;assay&quot;</span>)]</span></code></pre></div>
+<p>For the metadata fields, refer to <a href="https://seqout.org/cli/R/articles/metadata.html">Metadata</a>.</p>
+</div>
+</div>
+<div id="read-the-counts-matrices" class="section level2">
+<h2>Read the counts matrices</h2>
+<p><code>seqout</code> finds the processed supplementary files of GEO.
+It downloads these files and reads them into R matrices.</p>
+<div id="show-the-counts-files" class="section level3">
+<h3>Show the counts files</h3>
+<p><code>SeqoutListCounts()</code> shows the matrix units for a GEO
+accession. It does not download the matrix files. A unit is the smallest
+group of files that <code>seqout</code> can read as one matrix. Examples
+are a 10x triplet, or one <code>.h5</code>, <code>.h5ad</code>, or
+<code>.rds</code> file.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">SeqoutListCounts</span>(<span class="st">&quot;GSE297547&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>m <span class="ot">&lt;-</span> counts</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="fu">nrow</span>(m)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">head</span>(m[, <span class="fu">c</span>(<span class="st">&quot;unit&quot;</span>, <span class="st">&quot;sample&quot;</span>, <span class="st">&quot;format&quot;</span>, <span class="st">&quot;preferred&quot;</span>, <span class="st">&quot;has_metadata&quot;</span>)], <span class="dv">4</span>)</span></code></pre></div>
+</div>
+<div id="read-a-matrix" class="section level3">
+<h3>Read a matrix</h3>
+<p><code>SeqoutMatrix()</code> reads one unit into a list of
+<code>X</code>, <code>obs</code>, and <code>var</code>.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>rna <span class="ot">&lt;-</span> <span class="fu">SeqoutMatrix</span>(counts, <span class="at">sample =</span> <span class="st">&quot;GSM8994520&quot;</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">dim</span>(rna<span class="sc">$</span>X)</span></code></pre></div>
+</div>
+<div id="make-a-seurat-object" class="section level3">
+<h3>Make a Seurat object</h3>
+<p><code>Seqout2Seurat()</code> accepts one of these inputs:</p>
+<ul>
+<li>A matrix unit</li>
+<li>A GSM accession</li>
+<li>A GSE accession</li>
+<li>A table from <code>SeqoutListCounts()</code></li>
+</ul>
+<p>It sends the other arguments to
+<code>CreateSeuratObject()</code>.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>obj <span class="ot">&lt;-</span> <span class="fu">Seqout2Seurat</span>(<span class="st">&quot;GSE297547&quot;</span>, <span class="at">sample =</span> <span class="st">&quot;GSM8994520&quot;</span>, <span class="at">min.cells =</span> <span class="dv">3</span>, <span class="at">min.features =</span> <span class="dv">200</span>)</span></code></pre></div>
+<p>For the selection of units and for Seurat workflows, refer to <a href="https://seqout.org/cli/R/articles/counts.html">Counts</a>.</p>
+</div>
+<div id="change-old-gene-ids-and-repair-excel-errors" class="section level3">
+<h3>Change old gene IDs and repair Excel errors</h3>
+<p><code>SeqoutGeneNames()</code> uses the genevintage package. It
+selects an annotation and changes the gene IDs to gene names.
+<code>SeqoutCorrectNames()</code> repairs the gene symbols that Excel
+changed. It compares the symbols with a reference that you give. The two
+functions do not change the expression values. They keep a record of
+each change, and <code>SeqoutGeneReport()</code> shows this record.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># GSE52529: original Ensembl IDs, FPKM not raw counts</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>old <span class="ot">&lt;-</span> <span class="fu">SeqoutListCounts</span>(<span class="st">&quot;GSE52529&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="fu">SeqoutMatrix</span>(<span class="at">sample =</span> <span class="st">&quot;GSE52529_fpkm_matrix.txt.gz&quot;</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>named <span class="ot">&lt;-</span> old <span class="sc">|&gt;</span> <span class="fu">SeqoutGeneNames</span>()</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>named<span class="sc">$</span>gene_annotation[[<span class="dv">1</span>]]<span class="sc">$</span>annotation</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co"># GSE101942: verified Excel-damaged gene names</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>damaged <span class="ot">&lt;-</span> <span class="fu">SeqoutListCounts</span>(<span class="st">&quot;GSE101942&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>  <span class="fu">SeqoutMatrix</span>(<span class="at">sample =</span> <span class="st">&quot;GSE101942_IPSC_rawCounts.txt.gz&quot;</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>repaired <span class="ot">&lt;-</span> damaged <span class="sc">|&gt;</span> <span class="fu">SeqoutCorrectNames</span>(<span class="at">species =</span> <span class="st">&quot;human&quot;</span>, <span class="at">release =</span> <span class="dv">116</span>)</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>report <span class="ot">&lt;-</span> <span class="fu">SeqoutGeneReport</span>(repaired)</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>report[report<span class="sc">$</span>status <span class="sc">!=</span> <span class="st">&quot;unchanged&quot;</span>, ]</span></code></pre></div>
+<p>For GSE52529, genevintage selects GENCODE 17 on GRCh37. A version
+argument is not necessary. For examples that you can run, and to compare
+old symbols with new symbols, refer to <a href="gene-names.html">Gene
+names: old identifiers and Excel errors</a>.</p>
+</div>
+</div>
+<div id="download-the-data-files" class="section level2">
+<h2>Download the data files</h2>
+<p>Three functions download raw files and processed files:</p>
+<ul>
+<li><code>DownloadSupplementary()</code> downloads the processed files
+of a dataset. Examples are counts matrices, annotations, and
+archives.</li>
+<li><code>DownloadRuns()</code> downloads the raw sequence reads in
+FASTQ or SRA format.</li>
+<li><code>DownloadBAMs()</code> downloads the BAM alignment files of the
+submitter.</li>
+</ul>
+<p>Each function puts the files in a directory with the name of the
+accession. It does a check of the checksums. It does not download a file
+again if the file is on the disk.</p>
+<p>Before you download, look at the <code>supplementary</code>
+field:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">head</span>(d<span class="sc">$</span>supplementary, <span class="dv">4</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">DownloadSupplementary</span>(<span class="st">&quot;GSE168652&quot;</span>, <span class="st">&quot;GSE168652&quot;</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">DownloadRuns</span>(<span class="st">&quot;SRR12012336&quot;</span>, <span class="st">&quot;SRR12012336&quot;</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">DownloadBAMs</span>(<span class="st">&quot;ERP117016&quot;</span>, <span class="st">&quot;ERP117016&quot;</span>)</span></code></pre></div>
+<p>For the download modes and the checksums, refer to <a href="https://seqout.org/cli/R/articles/downloads.html">Downloads</a>.</p>
+</div>
+<div id="select-a-backend" class="section level2">
+<h2>Select a backend</h2>
+<table>
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Backend</th>
+<th>Method</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;api&quot;</code> (default)</td>
+<td>Sends queries to the REST API of <code>seqout.org</code> over
+HTTP.</td>
+<td>Usual workflows.</td>
+</tr>
+<tr class="even">
+<td><code>&quot;parquet&quot;</code></td>
+<td>Sends queries to the published Parquet dump with DuckDB.</td>
+<td>Offline workflows, large batch queries, and SQL analysis.</td>
+</tr>
+</tbody>
+</table>
+<p>To use the Parquet backend, you must give <code>&quot;parquet&quot;</code> to
+<code>SeqoutConnect()</code>. A query to the REST API does not scan the
+full dump.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">SeqoutConnect</span>(<span class="st">&quot;parquet&quot;</span>, <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="fu">Query</span>(<span class="st">&quot;SELECT count(*) AS n FROM geo_series&quot;</span>, <span class="at">con =</span> con)</span></code></pre></div>
+<p>Give the connection to <code>con</code>. Or, to make it the default
+for the session, use <code>SeqoutDefault(con)</code>.</p>
+<p>To close the Parquet connection, use <code>SeqoutClose()</code>:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">SeqoutClose</span>(con)</span></code></pre></div>
+<p>For downloads of the Parquet dump, refer to <a href="https://seqout.org/cli/R/articles/downloads.html">Downloads</a>.</p>
+</div>
+<div id="next-steps" class="section level2">
+<h2>Next steps</h2>
+<ul>
+<li><a href="https://seqout.org/cli/R/articles/search.html">Search</a>:
+query operators, filters, and sample cohorts.</li>
+<li><a href="https://seqout.org/cli/R/articles/metadata.html">Metadata</a>:
+dataset structures, publication records, and metrics from the
+reads.</li>
+<li><a href="https://seqout.org/cli/R/articles/counts.html">Counts</a>:
+GEO supplementary files and Seurat objects.</li>
+<li><a href="https://seqout.org/cli/R/articles/downloads.html">Downloads</a>:
+raw reads, alignments, and database dumps.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+
+</body>
+</html>
